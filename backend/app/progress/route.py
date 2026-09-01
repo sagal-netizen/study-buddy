@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
+from app.security import get_current_user
 
 from .repository import (
     mark_chapter_complete,
@@ -23,6 +24,7 @@ def get_db():
 
 # =========================
 # MARK CHAPTER COMPLETE
+# A student can only mark progress for their own account.
 # =========================
 
 @router.post(
@@ -31,8 +33,20 @@ def get_db():
 def complete_chapter(
     user_id: int,
     chapter_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    # Enforce that the authenticated user matches
+    # the user_id in the URL.  Admins may bypass this.
+    if (
+        current_user.get("user_id") != user_id
+        and current_user.get("role") != "admin"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only update your own progress"
+        )
+
     progress = mark_chapter_complete(
         db,
         user_id,
@@ -52,6 +66,7 @@ def complete_chapter(
 
 # =========================
 # GET USER PROGRESS
+# A student can only read their own progress.
 # =========================
 
 @router.get(
@@ -59,8 +74,18 @@ def complete_chapter(
 )
 def user_progress(
     user_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    if (
+        current_user.get("user_id") != user_id
+        and current_user.get("role") != "admin"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view your own progress"
+        )
+
     progress = get_user_progress(
         db,
         user_id

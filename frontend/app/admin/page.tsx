@@ -29,7 +29,16 @@ type Chapter = {
 export default function AdminDashboard() {
   const router = useRouter();
 
-  const API = "http://127.0.0.1:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+
+  // Helper: returns the Authorization header for admin API calls
+  const adminAuthHeader = () => ({
+    Authorization: `Bearer ${
+      typeof window !== "undefined"
+        ? (localStorage.getItem("admin_access_token") ?? "")
+        : ""
+    }`,
+  });
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -141,6 +150,7 @@ export default function AdminDashboard() {
           headers: {
             "Content-Type":
               "application/json",
+            ...adminAuthHeader(),
           },
           body: JSON.stringify({
             title,
@@ -201,6 +211,7 @@ export default function AdminDashboard() {
           headers: {
             "Content-Type":
               "application/json",
+            ...adminAuthHeader(),
           },
           body: JSON.stringify({
             title: chapterTitle,
@@ -342,6 +353,9 @@ export default function AdminDashboard() {
             `${API}/courses/${selectedCourse.id}/chapters/${selectedChapter.id}/materials`,
             {
               method: "POST",
+              headers: {
+                ...adminAuthHeader(),
+              },
               body: formData,
             }
           );
@@ -407,6 +421,9 @@ export default function AdminDashboard() {
           `${API}/materials/${materialId}`,
           {
             method: "DELETE",
+            headers: {
+              ...adminAuthHeader(),
+            },
           }
         );
 
@@ -454,6 +471,9 @@ export default function AdminDashboard() {
           `${API}/courses/${id}`,
           {
             method: "DELETE",
+            headers: {
+              ...adminAuthHeader(),
+            },
           }
         );
 

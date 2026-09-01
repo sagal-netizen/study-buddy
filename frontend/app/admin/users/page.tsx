@@ -21,7 +21,16 @@ type StudentReport = {
 export default function UserManagementPage() {
   const router = useRouter();
 
-  const API = "http://127.0.0.1:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+
+  // Helper: returns the Authorization header for admin API calls
+  const adminAuthHeader = () => ({
+    Authorization: `Bearer ${
+      typeof window !== "undefined"
+        ? (localStorage.getItem("admin_access_token") ?? "")
+        : ""
+    }`,
+  });
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +75,12 @@ export default function UserManagementPage() {
   const loadUsers = async () => {
     try {
       const response = await fetch(
-        `${API}/users`
+        `${API}/users`,
+        {
+          headers: {
+            ...adminAuthHeader(),
+          },
+        }
       );
 
       if (!response.ok) {

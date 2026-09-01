@@ -24,7 +24,9 @@ export default function RegisterPage() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/users/register",
+        `${
+          process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
+        }/users/register`,
         {
           method: "POST",
           headers: {
@@ -34,7 +36,6 @@ export default function RegisterPage() {
             name,
             email,
             password,
-            role: "student",
           }),
         }
       );

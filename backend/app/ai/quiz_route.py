@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.ai.quiz import generate_quiz
+from app.security import get_current_user
 
 
 router = APIRouter()
@@ -14,8 +15,10 @@ class QuizRequest(BaseModel):
 
 
 @router.post("/ai/quiz")
-def create_quiz(request: QuizRequest):
-
+def create_quiz(
+    request: QuizRequest,
+    _current_user: dict = Depends(get_current_user)
+):
     if not request.topic.strip():
         return {
             "questions": []

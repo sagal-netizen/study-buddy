@@ -3,7 +3,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.security import create_access_token
+from app.security import (
+    create_access_token,
+    get_current_user,
+    get_current_admin,
+)
 
 from .repository import (
     create_user,
@@ -40,7 +44,9 @@ class RegisterUser(BaseModel):
     name: str
     email: str
     password: str
-    role: str = "student"
+    # role is intentionally NOT accepted from the client.
+    # Public registration always creates a student account.
+    # Role changes are admin-only via PUT /users/{id}/role.
 
 
 class LoginUser(BaseModel):
@@ -53,7 +59,7 @@ class UpdateRole(BaseModel):
 
 
 # =========================
-# REGISTER
+# REGISTER  (public)
 # =========================
 
 @router.post("/users/register")
@@ -72,18 +78,14 @@ def register_user(
             detail="Email already registered"
         )
 
-    if user.role not in ["student", "admin"]:
-        raise HTTPException(
-            status_code=400,
-            detail="Role must be student or admin"
-        )
-
+    # Role is always "student" for public registration.
+    # The client cannot supply or override this value.
     new_user = create_user(
         db,
         user.name,
         user.email,
         user.password,
-        user.role
+        "student"
     )
 
     return {
@@ -98,7 +100,7 @@ def register_user(
 
 
 # =========================
-# LOGIN
+# LOGIN  (public)
 # =========================
 
 @router.post("/users/login")
@@ -147,17 +149,19 @@ def login_user(
             "name": existing_user.name,
             "email": existing_user.email,
             "role": existing_user.role
+            # password is intentionally excluded
         }
     }
 
 
 # =========================
-# GET ALL USERS
+# GET ALL USERS  (admin)
 # =========================
 
 @router.get("/users")
 def list_users(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(get_current_admin)
 ):
     users = get_all_users(db)
 
@@ -167,6 +171,7 @@ def list_users(
             "name": user.name,
             "email": user.email,
             "role": user.role
+            # password intentionally excluded
         }
         for user in users
     ]
@@ -174,13 +179,25 @@ def list_users(
 
 # =========================
 # GET SINGLE USER
+# Authenticated user can read their own profile.
+# Admin can read any profile.
 # =========================
 
 @router.get("/users/{user_id}")
 def get_single_user(
     user_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    if (
+        current_user.get("user_id") != user_id
+        and current_user.get("role") != "admin"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
     user = get_user_by_id(
         db,
         user_id
@@ -201,14 +218,15 @@ def get_single_user(
 
 
 # =========================
-# UPDATE USER ROLE
+# UPDATE USER ROLE  (admin)
 # =========================
 
 @router.put("/users/{user_id}/role")
 def change_user_role(
     user_id: int,
     data: UpdateRole,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(get_current_admin)
 ):
     if data.role not in [
         "student",
@@ -243,13 +261,14 @@ def change_user_role(
 
 
 # =========================
-# DELETE USER
+# DELETE USER  (admin)
 # =========================
 
 @router.delete("/users/{user_id}")
 def remove_user(
     user_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(get_current_admin)
 ):
     user = delete_user(
         db,

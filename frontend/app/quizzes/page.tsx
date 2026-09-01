@@ -18,7 +18,7 @@ type QuizHistory = {
   date: string;
 };
 
-const API = "http://127.0.0.1:8000555554rq1"; // Replace with your actual API endpoint                
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 export default function QuizzesPage() {
   const router = useRouter();
@@ -122,12 +122,18 @@ export default function QuizzesPage() {
     setFinished(false);
 
     try {
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("access_token") ?? ""
+          : "";
+
       const response = await fetch(
         `${API}/ai/quiz`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             topic: topic.trim(),

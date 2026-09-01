@@ -45,9 +45,26 @@ export default function CoursePage() {
 
   const courseId = params.course_id;
 
-  const API = "http://127.0.0.1:8000";
+  const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
-  const USER_ID = 1;
+  // Read the authenticated user from localStorage.
+  // Falls back to null if not logged in — progress calls
+  // will silently skip rather than use a wrong ID.
+  const getStoredUser = (): { id: number; name: string } | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getAuthHeaders = (): Record<string, string> => {
+    if (typeof window === "undefined") return {};
+    const token = localStorage.getItem("access_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   const [course, setCourse] =
     useState<Course | null>(null);
@@ -128,16 +145,23 @@ export default function CoursePage() {
         // LOAD PROGRESS
         // -------------------------------------------------
 
-        const progressResponse =
-          await fetch(
-            `${API}/progress/${USER_ID}`
-          );
+        const storedUser = getStoredUser();
 
-        if (progressResponse.ok) {
-          const progressData =
-            await progressResponse.json();
+        if (storedUser) {
+          const progressResponse =
+            await fetch(
+              `${API}/progress/${storedUser.id}`,
+              {
+                headers: getAuthHeaders(),
+              }
+            );
 
-          setProgress(progressData);
+          if (progressResponse.ok) {
+            const progressData =
+              await progressResponse.json();
+
+            setProgress(progressData);
+          }
         }
 
         // -------------------------------------------------
@@ -202,12 +226,22 @@ export default function CoursePage() {
   const markComplete = async (
     chapterId: number
   ) => {
+    const storedUser = getStoredUser();
+
+    if (!storedUser) {
+      setMessage(
+        "You must be logged in to save progress."
+      );
+      return;
+    }
+
     try {
       const response =
         await fetch(
-          `${API}/progress/${USER_ID}/${chapterId}/complete`,
+          `${API}/progress/${storedUser.id}/${chapterId}/complete`,
           {
             method: "POST",
+            headers: getAuthHeaders(),
           }
         );
 
@@ -250,7 +284,7 @@ export default function CoursePage() {
           {
             id:
               data.progress.id,
-            user_id: USER_ID,
+            user_id: storedUser.id,
             chapter_id: chapterId,
             completed: true,
           },
@@ -306,6 +340,7 @@ export default function CoursePage() {
             headers: {
               "Content-Type":
                 "application/json",
+              ...getAuthHeaders(),
             },
 
             body: JSON.stringify({
