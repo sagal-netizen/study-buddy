@@ -1,10 +1,5 @@
-import ollama
-
-from app.database import (
-    search_documents,
-    OLLAMA_BASE_URL,
-    OLLAMA_CHAT_MODEL,
-)
+from app.ai.llm import chat
+from app.ai.vector_store import search_documents
 
 
 def ask_studybuddy(
@@ -13,27 +8,33 @@ def ask_studybuddy(
     course_id: int | None = None
 ):
 
-    results = search_documents(
-        question,
-        number_of_results
+    try:
+        results = search_documents(
+            question,
+            number_of_results,
+            course_id
+        )
+    except Exception as error:
+        print("Search error:", error)
+        results = {}
+
+    documents = (results.get("documents") or [[]])[0]
+
+    context = "\n\n".join(
+        documents
     )
-
-    documents = results.get(
-        "documents",
-        [[]]
-    )[0]
-
-    context = "\n\n".join(documents)
 
     course_context = ""
 
     if course_id is not None:
+
         course_context = f"""
 The student is currently studying course ID {course_id}.
 
 Focus your academic explanations on this course
 and its learning material when relevant.
 """
+
 
     prompt = f"""
 You are an AI tutor inside StudyBuddy AI.
@@ -87,31 +88,24 @@ STUDENT QUESTION:
 Give a helpful response.
 """
 
+
     try:
-        ollama_client = ollama.Client(
-            host=OLLAMA_BASE_URL
-        )
 
-        response = ollama_client.chat(
-            model=OLLAMA_CHAT_MODEL,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
+        answer = chat(prompt)
 
-        answer = response["message"]["content"]
 
     except Exception as error:
 
-        print("Ollama error:", error)
+        print(
+            "AI error:",
+            error
+        )
 
         answer = (
             "I'm having trouble connecting to my AI "
             "tutor right now. Please try again."
         )
+
 
     return {
         "answer": answer,

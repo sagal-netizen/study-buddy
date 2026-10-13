@@ -1,10 +1,7 @@
 import json
 import random
-import ollama
 
-from app.database import OLLAMA_BASE_URL, OLLAMA_CHAT_MODEL
-
-MODEL = OLLAMA_CHAT_MODEL
+from app.ai.llm import chat
 
 
 def generate_quiz(
@@ -12,31 +9,29 @@ def generate_quiz(
     number_of_questions: int = 5,
     difficulty: str = "medium"
 ):
+
     topic = topic.strip()
+    number_of_questions = max(1, min(number_of_questions, 20))
 
     if not topic:
+
         return {
             "questions": []
         }
 
+
     # --------------------------------------------------------
     # CREATE A BALANCED ANSWER PATTERN
     # --------------------------------------------------------
-    #
-    # This prevents the model from making every answer A.
-    #
-    # For example, with 5 questions:
-    #
-    # A, C, B, D, A
-    #
-    # The positions are shuffled before being given to Ollama.
-    #
+
     answer_positions = (
         list(range(4))
         * ((number_of_questions // 4) + 1)
     )[:number_of_questions]
 
-    random.shuffle(answer_positions)
+    random.shuffle(
+        answer_positions
+    )
 
 
     # --------------------------------------------------------
@@ -108,7 +103,7 @@ OTHER RULES:
 3. There must be exactly one correct answer.
 
 4. Questions should test understanding, not only
-   memorization.
+memorization.
 
 5. Avoid ambiguous questions.
 
@@ -144,29 +139,12 @@ option AND the requested answer position.
 
 
     # --------------------------------------------------------
-    # CALL OLLAMA
+    # CALL MISTRAL
     # --------------------------------------------------------
 
     try:
 
-        ollama_client = ollama.Client(host=OLLAMA_BASE_URL)
-
-        response = ollama_client.chat(
-            model=MODEL,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-
-        content = (
-            response
-            .get("message", {})
-            .get("content", "")
-            .strip()
-        )
+        content = chat(prompt).strip()
 
 
         # ----------------------------------------------------
@@ -216,7 +194,6 @@ option AND the requested answer position.
             ):
                 continue
 
-
             question_text = item.get(
                 "question"
             )
@@ -235,10 +212,8 @@ option AND the requested answer position.
                 ""
             )
 
-
             if not question_text:
                 continue
-
 
             if not isinstance(
                 options,
@@ -246,35 +221,34 @@ option AND the requested answer position.
             ):
                 continue
 
-
             if len(options) != 4:
                 continue
 
+            options = [str(option).strip() for option in options]
 
-            if not isinstance(
-                answer,
-                int
+            # options must be non-empty and distinct, otherwise the
+            # shuffle below could duplicate or lose the correct answer
+            if (
+                not all(options)
+                or len(set(options)) != 4
             ):
                 continue
 
+            if (
+                not isinstance(answer, int)
+                or isinstance(answer, bool)
+            ):
+                continue
 
             if answer < 0 or answer > 3:
                 continue
 
-
             valid_questions.append(
                 {
-                    "question":
-                        question_text,
-
-                    "options":
-                        options,
-
-                    "answer":
-                        answer,
-
-                    "explanation":
-                        explanation
+                    "question": question_text,
+                    "options": options,
+                    "answer": answer,
+                    "explanation": explanation
                 }
             )
 
@@ -293,19 +267,8 @@ option AND the requested answer position.
         # ----------------------------------------------------
         # FINAL ANSWER-POSITION CORRECTION
         # ----------------------------------------------------
-        #
-        # We now force the answer positions to be distributed.
-        #
-        # Instead of trusting the model to always obey,
-        # we rearrange each question's options.
-        #
-        # This preserves the actual correct answer while
-        # changing where it appears.
-        #
-        # ----------------------------------------------------
 
         final_questions = []
-
 
         for index, question in enumerate(
             valid_questions
@@ -319,21 +282,16 @@ option AND the requested answer position.
                 "answer"
             ]
 
-
             if (
                 correct_index < 0
                 or correct_index >= len(options)
             ):
                 continue
 
-
-            # Find the actual correct answer.
             correct_answer = options[
                 correct_index
             ]
 
-
-            # Remove it from the options.
             remaining_options = [
                 option
                 for option_index, option
@@ -341,8 +299,6 @@ option AND the requested answer position.
                 if option_index != correct_index
             ]
 
-
-            # Desired location for the correct answer.
             desired_position = (
                 answer_positions[
                     index
@@ -350,14 +306,10 @@ option AND the requested answer position.
                 ]
             )
 
-
-            # Shuffle the incorrect answers.
             random.shuffle(
                 remaining_options
             )
 
-
-            # Build new option list.
             new_options = []
 
             incorrect_index = 0
@@ -379,7 +331,6 @@ option AND the requested answer position.
                     )
 
                     incorrect_index += 1
-
 
             final_questions.append(
                 {

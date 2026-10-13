@@ -11,6 +11,10 @@ export default function AdminLogin() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const API =
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://127.0.0.1:8000";
+
   const handleLogin = async () => {
     setMessage("");
 
@@ -23,9 +27,7 @@ export default function AdminLogin() {
 
     try {
       const response = await fetch(
-        `${
-          process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
-        }/users/login`,
+        `${API}/users/login`,
         {
           method: "POST",
           headers: {
@@ -41,14 +43,17 @@ export default function AdminLogin() {
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(data.detail || "Invalid email or password.");
+        setMessage(
+          data.detail || "Invalid email or password."
+        );
         setLoading(false);
         return;
       }
 
-      // Only allow admin accounts
       if (data.user?.role !== "admin") {
-        setMessage("You do not have administrator access.");
+        setMessage(
+          "You do not have administrator access."
+        );
         setLoading(false);
         return;
       }
@@ -101,7 +106,6 @@ export default function AdminLogin() {
 
           </div>
 
-
           <div className="rounded-[2rem] border border-[#8b1234]/30 bg-[#110b0f] p-8">
 
             <label className="text-xs uppercase tracking-[0.2em] text-white/35">
@@ -111,11 +115,12 @@ export default function AdminLogin() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) =>
+                setEmail(e.target.value)
+              }
               placeholder="admin@example.com"
               className="mt-2 mb-5 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none placeholder:text-white/20 focus:border-[#8b1234]"
             />
-
 
             <label className="text-xs uppercase tracking-[0.2em] text-white/35">
               Password
@@ -124,7 +129,9 @@ export default function AdminLogin() {
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) =>
+                setPassword(e.target.value)
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleLogin();
@@ -134,15 +141,15 @@ export default function AdminLogin() {
               className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none placeholder:text-white/20 focus:border-[#8b1234]"
             />
 
-
             <button
               onClick={handleLogin}
               disabled={loading}
               className="mt-6 w-full rounded-xl bg-[#8b1234] py-3.5 text-sm font-medium transition hover:bg-[#b21e45] disabled:opacity-50"
             >
-              {loading ? "Verifying..." : "Enter Admin Portal"}
+              {loading
+                ? "Verifying..."
+                : "Enter Admin Portal"}
             </button>
-
 
             {message && (
               <p className="mt-4 text-center text-sm text-[#c98296]">
@@ -150,8 +157,16 @@ export default function AdminLogin() {
               </p>
             )}
 
-          </div>
+            <button
+              onClick={() =>
+                router.push("/admin-register")
+              }
+              className="mt-5 w-full text-center text-xs text-[#c9a56a] hover:text-[#e3c88f]"
+            >
+              Create Admin Account →
+            </button>
 
+          </div>
 
           <button
             onClick={() => router.push("/")}
